@@ -2,13 +2,13 @@ import subprocess
 import time
 from collections import defaultdict
 
-# إعدادات الحماية
-THRESHOLD = 20  # الحد الأقصى لعدد الاتصالات المسموح بها لكل IP
-TIME_FRAME = 40  # الفترة الزمنية للتحقق بالثواني
+# Protection settings
+THRESHOLD = 20  # Maximum allowed connections per IP
+TIME_FRAME = 40  # Time frame for checking in seconds
 BANNED_IPS = set()
 
 def get_incoming_ips():
-    """الحصول على عناوين IP المتصلة بالخادم."""
+    """Retrieve incoming IP addresses connected to the server."""
     result = subprocess.run(['netstat', '-ntu'], stdout=subprocess.PIPE)
     lines = result.stdout.decode().split('\n')
     ips = []
@@ -21,14 +21,14 @@ def get_incoming_ips():
     return ips
 
 def ban_ip(ip):
-    """حظر عنوان IP باستخدام iptables."""
+    """Ban an IP address using iptables."""
     if ip not in BANNED_IPS:
         subprocess.run(['sudo', 'iptables', '-A', 'INPUT', '-s', ip, '-j', 'DROP'])
         BANNED_IPS.add(ip)
-        print(f"تم حظر IP: {ip}")
+        print(f"Banned IP: {ip}")
 
 def monitor():
-    """مراقبة الاتصالات وحظر IPs المشبوهة."""
+    """Monitor connections and ban suspicious IPs."""
     while True:
         ip_counter = defaultdict(int)
         ips = get_incoming_ips()
@@ -39,9 +39,9 @@ def monitor():
             if count > THRESHOLD:
                 ban_ip(ip)
         
-        print("[INFO] تم التحقق من الاتصالات.")
+        print("[INFO] Checked connections.")
         time.sleep(TIME_FRAME)
 
 if __name__ == "__main__":
-    print("[START] بدء مراقبة الحماية من DDoS...")
+    print("[START] Starting DDoS protection monitoring...")
     monitor()
