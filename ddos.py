@@ -2,9 +2,9 @@ import subprocess
 import time
 from collections import defaultdict
 
-# Protection settings
-THRESHOLD = 20  # Maximum allowed connections per IP
-TIME_FRAME = 40  # Time frame for checking in seconds
+
+THRESHOLD = 20  
+TIME_FRAME = 40  
 BANNED_IPS = set()
 
 def get_incoming_ips():
@@ -21,14 +21,14 @@ def get_incoming_ips():
     return ips
 
 def ban_ip(ip):
-    """Ban an IP address using iptables."""
+    
     if ip not in BANNED_IPS:
         subprocess.run(['sudo', 'iptables', '-A', 'INPUT', '-s', ip, '-j', 'DROP'])
         BANNED_IPS.add(ip)
         print(f"Banned IP: {ip}")
 
 def monitor():
-    """Monitor connections and ban suspicious IPs."""
+    
     while True:
         ip_counter = defaultdict(int)
         ips = get_incoming_ips()
