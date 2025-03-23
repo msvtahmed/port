@@ -5,7 +5,7 @@ import time
 import requests
 
 # Define the maximum number of requests per second
-THRESHOLD = 20
+THRESHOLD = 500
 WEBHOOK_URL = "https://discord.com/api/webhooks/1351189330064048128/Mdv4DesbJFaxg25lFsEpzvxzfUS4qMR-c_MXEZ61xtZhNOo_XMlFTg-me_wgDvDqqhiP"
 ip_requests = defaultdict(list)
 banned_ips = set()
