@@ -10,6 +10,9 @@ WEBHOOK_URL = "https://discord.com/api/webhooks/1351189330064048128/Mdv4DesbJFax
 ip_requests = defaultdict(list)
 banned_ips = set()
 
+# IP to exclude from banning
+EXCLUDED_IP = "88.214.58.38"
+
 def send_webhook(ip):
     data = {"content": f"🚨 Suspicious IP blocked: {ip}"}
     try:
@@ -27,6 +30,11 @@ def block_ip(ip):
 def packet_handler(packet):
     if packet.haslayer("IP"):
         src_ip = packet["IP"].src
+        
+        # Skip blocking the excluded IP
+        if src_ip == EXCLUDED_IP:
+            return
+
         current_time = time.time()
         ip_requests[src_ip].append(current_time)
         
