@@ -12,7 +12,7 @@ PORT = 8080
 THRESHOLD = 1000
 
 # Set the Discord webhook URL for sending notifications
-DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/your-webhook-url-here'
+DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1351189330064048128/Mdv4DesbJFaxg25lFsEpzvxzfUS4qMR-c_MXEZ61xtZhNOo_XMlFTg-me_wgDvDqqhiP'
 
 # Create a UDP socket and bind it to the specified address and port
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -36,7 +36,7 @@ def parse_packet(packet):
 
 # Define a function to send notifications to Discord
 def send_discord_notification(msg):
-    client = discord.Webhook.from_url(https://discord.com/api/webhooks/1351189330064048128/Mdv4DesbJFaxg25lFsEpzvxzfUS4qMR-c_MXEZ61xtZhNOo_XMlFTg-me_wgDvDqqhiP, adapter=discord.RequestsWebhookAdapter())
+    client = discord.Webhook.from_url(DISCORD_WEBHOOK_URL, adapter=discord.RequestsWebhookAdapter())
     client.send(msg)
 
 # Define a function to monitor incoming network traffic for DDoS attacks
