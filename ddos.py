@@ -1,54 +1,43 @@
-import scapy.all as scapy
-from collections import defaultdict
 import os
-import time
+import requests
 
-# إعداد معايير الاشتباه
-REQUEST_THRESHOLD = 30  # الحد الأقصى للطلبات في الثانية قبل حظر IP
-BAN_TIME = 300  # مدة الحظر بالثواني (5 دقائق)
-MONITORED_INTERFACE = "eth0"  # الواجهة التي سيتم مراقبتها (عدلها حسب شبكتك)
+# مصادر قوائم الحظر (يمكنك إضافة المزيد)
+BLACKLIST_URLS = [
+    "https://iplists.firehol.org/files/firehol_level1.netset",  # FireHOL Level 1
+    "https://www.spamhaus.org/drop/drop.txt"  # Spamhaus DROP List
+]
 
-# قائمة لتتبع عدد الطلبات لكل IP
-ip_request_count = defaultdict(int)
-banned_ips = {}
+BLACKLIST_FILE = "/tmp/blacklist_ips.txt"
 
-def block_ip(ip):
-    """إضافة IP إلى قائمة الحظر باستخدام iptables"""
-    if ip not in banned_ips:
-        print(f"[!] حظر IP مشبوه: {ip}")
-        os.system(f"iptables -A INPUT -s {ip} -j DROP")
-        banned_ips[ip] = time.time()  # تسجيل وقت الحظر
+def download_blacklist():
+    """تحميل قائمة عناوين IP المشبوهة وحفظها في ملف"""
+    print("[*] تحميل قائمة الحظر...")
+    with open(BLACKLIST_FILE, "w") as file:
+        for url in BLACKLIST_URLS:
+            try:
+                response = requests.get(url, timeout=10)
+                if response.status_code == 200:
+                    file.write(response.text + "\n")
+                    print(f"[+] تم تحميل القائمة من: {url}")
+                else:
+                    print(f"[!] فشل تحميل القائمة من: {url}")
+            except requests.RequestException as e:
+                print(f"[!] خطأ أثناء التحميل: {e}")
 
-def unblock_expired_ips():
-    """إزالة الحظر بعد BAN_TIME"""
-    current_time = time.time()
-    for ip in list(banned_ips.keys()):
-        if current_time - banned_ips[ip] > BAN_TIME:
-            print(f"[+] إزالة الحظر عن: {ip}")
-            os.system(f"iptables -D INPUT -s {ip} -j DROP")
-            del banned_ips[ip]
+def block_ips():
+    """حظر عناوين IP المشبوهة باستخدام iptables"""
+    print("[*] بدء عملية الحظر...")
+    with open(BLACKLIST_FILE, "r") as file:
+        for line in file:
+            ip = line.strip()
+            if ip and not ip.startswith("#"):
+                os.system(f"iptables -A INPUT -s {ip} -j DROP")
+                print(f"[BLOCKED] حظر IP: {ip}")
 
-def process_packet(packet):
-    """تحليل الحزم الواردة"""
-    if packet.haslayer(scapy.IP):  
-        ip_src = packet[scapy.IP].src
-        ip_request_count[ip_src] += 1
-
-        if ip_request_count[ip_src] > REQUEST_THRESHOLD:
-            block_ip(ip_src)
-
-def monitor_traffic():
-    """مراقبة الترافيك الحي"""
-    print("[*] بدء مراقبة الترافيك... اضغط Ctrl+C للإيقاف.")
-    try:
-        while True:
-            scapy.sniff(iface=MONITORED_INTERFACE, prn=process_packet, store=False, count=10)
-            unblock_expired_ips()  # إزالة الحظر عن IPs القديمة
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\n[*] إيقاف المراقبة. تنظيف الحظر...")
-        for ip in banned_ips.keys():
-            os.system(f"iptables -D INPUT -s {ip} -j DROP")
+def main():
+    download_blacklist()
+    block_ips()
+    print("[✅] تم تفعيل الحماية ضد الهجمات!")
 
 if __name__ == "__main__":
-    monitor_traffic()
+    main()
