@@ -6,7 +6,7 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     # تأخير 5 ثواني لحماية DDoS
-    time.sleep(5)
+    time.sleep(8)
     return "مرحبًا بك في السيرفر بعد الانتظار."
 
 if __name__ == '__main__':
