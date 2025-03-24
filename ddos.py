@@ -4,7 +4,7 @@ import requests
 from collections import defaultdict
 
 THRESHOLD = 20  
-TIME_FRAME = 10  
+TIME_FRAME = 15  
 BANNED_IPS = set()
 EXEMPTED_IPS = {"88.214.58.38"}  
 WEBHOOK_URL = "https://discord.com/api/webhooks/1351189330064048128/Mdv4DesbJFaxg25lFsEpzvxzfUS4qMR-c_MXEZ61xtZhNOo_XMlFTg-me_wgDvDqqhiP" 
