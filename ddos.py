@@ -1,64 +1,57 @@
-import subprocess
+import socket
+import struct
 import time
 import requests
-from collections import defaultdict
+from collections import Counter
 
-THRESHOLD = 20  
-TIME_FRAME = 10  
-BANNED_IPS = set()
-EXEMPTED_IPS = {"88.214.58.38"}  
-WEBHOOK_URL = "https://discord.com/api/webhooks/1351189330064048128/Mdv4DesbJFaxg25lFsEpzvxzfUS4qMR-c_MXEZ61xtZhNOo_XMlFTg-me_wgDvDqqhiP" 
+# إعداد متغيرات المراقبة
+HOST = "0.0.0.0"  # الاستماع على جميع الواجهات
+INTERVAL = 10  # مدة التحليل بالثواني
+WEBHOOK_URL = "https://discord.com/api/webhooks/1351189330064048128/Mdv4DesbJFaxg25lFsEpzvxzfUS4qMR-c_MXEZ61xtZhNOo_XMlFTg-me_wgDvDqqhiP"  # رابط الويب هوك
 
-def get_incoming_ips():
-    """استرجاع عناوين IP المتصلة بالخادم."""
-    result = subprocess.run(['netstat', '-ntu'], stdout=subprocess.PIPE)
-    lines = result.stdout.decode().split('\n')
-    ips = []
-    for line in lines[2:]:
-        parts = line.split()
-        if len(parts) >= 5:
-            ip = parts[4].split(':')[0]
-            if ip and ip != '127.0.0.1':
-                ips.append(ip)
-    return ips
+# إنشاء قاموس لتتبع عدد الاتصالات لكل منفذ
+port_counts = Counter()
 
-def send_webhook_notification(ip):
-    """هون ببين يلي راح ينحظرو."""
+def send_webhook_alert(port, count):
     data = {
-        "content": f"الاخ ددوس خذ باند: `{ip}` !"
+        "content": f"🚨 تنبيه: المنفذ {port} يتلقى هجومًا محتملاً بعدد طلبات: {count}"
     }
     try:
-        response = requests.post(WEBHOOK_URL, json=data)
-        if response.status_code == 204:
-            print(f"[WEBHOOK] Notification sent for IP: {ip}")
-        else:
-            print(f"[WEBHOOK] Failed to send notification for IP: {ip}")
+        requests.post(WEBHOOK_URL, json=data)
     except Exception as e:
-        print(f"[WEBHOOK] Error sending notification: {e}")
+        print(f"[!] فشل إرسال التنبيه إلى Webhook: {e}")
 
-def ban_ip(ip):
-    """هون بتراقب ال ip"""
-    if ip not in BANNED_IPS and ip not in EXEMPTED_IPS:
-        subprocess.run(['sudo', 'iptables', '-A', 'INPUT', '-s', ip, '-j', 'DROP'])
-        BANNED_IPS.add(ip)
-        print(f"Banned IP: {ip}")
-        send_webhook_notification(ip)
-
-def monitor():
-    """هون بنقلعو وبوخذو حظر."""
+def analyze_traffic():
+    global port_counts
+    
+    # إنشاء سوكيت للاستماع على جميع الحزم
+    sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_TCP)
+    sock.bind((HOST, 0))
+    
     while True:
-        ip_counter = defaultdict(int)
-        ips = get_incoming_ips()
-        for ip in ips:
-            ip_counter[ip] += 1
+        start_time = time.time()
+        port_counts.clear()
         
-        for ip, count in ip_counter.items():
-            if count > THRESHOLD:
-                ban_ip(ip)
+        while time.time() - start_time < INTERVAL:
+            packet, addr = sock.recvfrom(65535)
+            ip_header = packet[:20]
+            ip_data = struct.unpack('!BBHHHBBH4s4s', ip_header)
+            protocol = ip_data[6]
+            
+            if protocol == 6:  # 6 = بروتوكول TCP
+                tcp_header = packet[20:40]
+                tcp_data = struct.unpack('!HHLLBBHHH', tcp_header)
+                dest_port = tcp_data[1]
+                port_counts[dest_port] += 1
         
-        print("[INFO] Checked connections.")
-        time.sleep(TIME_FRAME)
+        # العثور على المنفذ الأكثر استقبالاً للطلبات
+        if port_counts:
+            most_attacked_port = port_counts.most_common(1)[0]
+            print(f"[!] أكثر منفذ مستهدف: {most_attacked_port[0]} بعدد طلبات: {most_attacked_port[1]}")
+            send_webhook_alert(most_attacked_port[0], most_attacked_port[1])
+        else:
+            print("[*] لم يتم رصد نشاط غير طبيعي.")
 
 if __name__ == "__main__":
-    print("[START] Starting DDoS protection monitoring...")
-    monitor()
+    print("[*] بدء مراقبة الهجمات على المنافذ...")
+    analyze_traffic()
