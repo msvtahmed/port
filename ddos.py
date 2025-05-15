@@ -23,7 +23,7 @@ def handle_client(client_socket, addr):
             connections_per_ip[ip] -= 1
         client_socket.close()
 
-def run_server(host='0.0.0.0', port=8080):
+def run_server(host='0.0.0.0', port=8971):
     global current_connections
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
         server.bind((host, port))
