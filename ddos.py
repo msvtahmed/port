@@ -1,50 +1,62 @@
-import socket
-import threading
-from collections import defaultdict
+import os
+import sys
+import urllib.request
 
-MAX_CONNECTIONS = 15
-MAX_CONN_PER_IP = 5
+# قائمة الدول التي تريد حظرها (ISO 2-letter country codes)
+blocked_countries = [
+    # دول أوروبا (EU + أوروبا عموماً)
+    "AL", "AD", "AT", "BY", "BE", "BA", "BG", "HR", "CY", "CZ",
+    "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IS", "IE", "IT",
+    "LV", "LI", "LT", "LU", "MT", "MD", "MC", "ME", "NL", "MK",
+    "NO", "PL", "PT", "RO", "RU", "SM", "RS", "SK", "SI", "ES",
+    "SE", "CH", "TR", "UA", "GB", "VA",
 
-lock = threading.Lock()
-current_connections = 0
-connections_per_ip = defaultdict(int)
+    # بالإضافة إلى إيران والهند وأمريكا
+    "IR", "IN", "US"
+]
 
-def handle_client(client_socket, addr):
-    global current_connections
-    ip = addr[0]
+IPDENY_BASE_URL = "http://www.ipdeny.com/ipblocks/data/countries/"
+
+def download_country_ip(country_code):
+    url = f"{IPDENY_BASE_URL}{country_code.lower()}.zone"
+    print(f"تحميل IPs للدولة: {country_code} من {url}")
     try:
-        client_socket.sendall("أهلاً وسهلاً!".encode('utf-8'))
-        client_socket.recv(1024)
-    except:
-        pass
-    finally:
-        with lock:
-            current_connections -= 1
-            connections_per_ip[ip] -= 1
-        client_socket.close()
+        response = urllib.request.urlopen(url)
+        data = response.read().decode()
+        return data.splitlines()
+    except Exception as e:
+        print(f"خطأ في تحميل IPs للدولة {country_code}: {e}")
+        return []
 
-def run_server(host='0.0.0.0', port=8971):
-    global current_connections
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind((host, port))
-        server.listen()
-        print(f"السيرفر شغّال ع {host}:{port} ...")
-        while True:
-            client_socket, addr = server.accept()
-            ip = addr[0]
+def generate_iptables_rules(ip_list):
+    rules = []
+    for ip_range in ip_list:
+        rules.append(f"iptables -A INPUT -s {ip_range} -j DROP")
+    return rules
 
-            with lock:
-                if current_connections >= MAX_CONNECTIONS or connections_per_ip[ip] >= MAX_CONN_PER_IP:
-                    try:
-                        client_socket.sendall("الموقع مليان أو وصلت حد الاتصالات من IP تبعك.\n".encode('utf-8'))
-                    except:
-                        pass
-                    client_socket.close()
-                    continue
-                current_connections += 1
-                connections_per_ip[ip] += 1
+def main():
+    all_rules = []
+    for country in blocked_countries:
+        ips = download_country_ip(country)
+        rules = generate_iptables_rules(ips)
+        all_rules.extend(rules)
 
-            threading.Thread(target=handle_client, args=(client_socket, addr), daemon=True).start()
+    # طباعة القواعد للمراجعة
+    print("\n# قواعد iptables للحظر:\n")
+    for rule in all_rules:
+        print(rule)
+
+    # تأكيد التنفيذ
+    confirm = input("\nهل تريد تنفيذ هذه القواعد الآن؟ (yes/no): ").strip().lower()
+    if confirm == "yes":
+        for rule in all_rules:
+            os.system(rule)
+        print("\nتم تنفيذ قواعد الحظر بنجاح!")
+    else:
+        print("تم إلغاء التنفيذ.")
 
 if __name__ == "__main__":
-    run_server()
+    if os.geteuid() != 0:
+        print("يرجى تشغيل السكربت كـ root (sudo).")
+        sys.exit(1)
+    main()
